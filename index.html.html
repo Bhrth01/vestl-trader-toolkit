@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vestl Trader Toolkit — Position Sizing</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #F0F4F8;
+  --surface: #FFFFFF;
+  --surf2:   #F7FAFC;
+  --navy:    #0F2744;
+  --blue:    #1D6AE5;
+  --green:   #059669;
+  --amber:   #D97706;
+  --red:     #DC2626;
+  --border:  #E2EAF2;
+  --text:    #1A2B3C;
+  --muted:   #64748B;
+  --font:    'Roboto', sans-serif;
+  --mono:    'Roboto Mono', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── Nav ── */
+nav {
+  background: var(--navy); padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 56px; position: sticky; top: 0; z-index: 100;
+}
+.nav-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 16px; }
+.nav-badge { background: var(--blue); color: #fff; font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 4px; letter-spacing: .5px; text-transform: uppercase; }
+.nav-tabs { display: flex; gap: 4px; }
+.nav-tab { background: none; border: none; color: rgba(255,255,255,.45); font-family: var(--font); font-size: 13px; font-weight: 500; padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all .15s; }
+.nav-tab:hover  { color: rgba(255,255,255,.8); background: rgba(255,255,255,.07); }
+.nav-tab.active { color: #fff; background: rgba(255,255,255,.13); }
+.soon-tag { font-size: 9px; color: rgba(255,255,255,.25); font-style: italic; margin-left: 3px; }
+
+/* ── Layout ── */
+.page { display: none; }
+.page.active { display: block; }
+.container { max-width: 960px; margin: 0 auto; padding: 24px 20px; }
+.page-header { margin-bottom: 20px; }
+.page-header h1 { font-size: 21px; font-weight: 700; color: var(--navy); }
+.page-header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* ── Stock Box ── */
+.stock-box {
+  background: var(--navy); border-radius: 14px; padding: 20px 22px;
+  margin-bottom: 16px; position: relative; overflow: hidden;
+}
+.stock-box::after {
+  content: ''; position: absolute; top: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(29,106,229,.18) 0%, transparent 65%);
+  pointer-events: none;
+}
+.s-label { color: rgba(255,255,255,.45); font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+.s-input-row { display: flex; gap: 8px; }
+#symbolInput {
+  flex: 1; background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.13);
+  border-radius: 8px; padding: 11px 14px; color: #fff;
+  font-family: var(--mono); font-size: 15px; font-weight: 500;
+  letter-spacing: 1.5px; text-transform: uppercase; outline: none; transition: border .2s;
+}
+#symbolInput::placeholder { color: rgba(255,255,255,.22); letter-spacing: 0; font-size: 12px; text-transform: none; font-weight: 400; }
+#symbolInput:focus { border-color: var(--blue); }
+.ex-row { display: flex; align-items: center; gap: 6px; margin-top: 9px; }
+.ex-lbl { font-size: 10px; color: rgba(255,255,255,.35); text-transform: uppercase; letter-spacing: .5px; }
+.expill {
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 5px; padding: 3px 12px; color: rgba(255,255,255,.45);
+  font-family: var(--font); font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s;
+}
+.expill:hover  { background: rgba(255,255,255,.14); color: rgba(255,255,255,.8); }
+.expill.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+#fetchBtn {
+  background: var(--blue); border: none; border-radius: 8px; padding: 11px 26px;
+  color: #fff; font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap;
+}
+#fetchBtn:hover  { background: #1558c0; }
+#fetchBtn:active { transform: scale(.97); }
+#fetchBtn.loading { opacity: .5; pointer-events: none; }
+.data-hint { font-size: 10px; color: rgba(255,255,255,.2); font-style: italic; margin-top: 7px; }
+#priceDisplay { margin-top: 14px; min-height: 28px; }
+.s-placeholder { color: rgba(255,255,255,.22); font-size: 12px; font-style: italic; }
+.s-loading     { color: rgba(255,255,255,.45); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.s-error       { color: #F87171; font-size: 12px; line-height: 1.6; }
+.price-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.price-name { display: flex; flex-direction: column; gap: 2px; }
+.price-company { color: rgba(255,255,255,.85); font-size: 14px; font-weight: 500; }
+.price-exch    { color: rgba(255,255,255,.3); font-size: 10px; font-family: var(--mono); }
+.price-val { font-family: var(--mono); font-size: 32px; font-weight: 500; color: #fff; letter-spacing: -.5px; line-height: 1; }
+.price-cur { font-size: 14px; color: rgba(255,255,255,.4); margin-right: 2px; }
+.price-badge { font-family: var(--mono); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+.price-badge.up   { background: rgba(5,150,105,.2); color: #34D399; }
+.price-badge.down { background: rgba(220,38,38,.2); color: #F87171; }
+.use-btn {
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.16);
+  border-radius: 7px; padding: 8px 16px; color: rgba(255,255,255,.75);
+  font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; transition: all .15s;
+}
+.use-btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ── Stock Info Panel ── */
+#stockInfoPanel { display: none; margin-bottom: 16px; }
+.info-panel { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.info-panel-header {
+  padding: 11px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; background: var(--surf2);
+}
+.info-panel-header h3 { font-size: 12px; font-weight: 600; color: var(--navy); }
+.info-panel-header span { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.info-grid { display: grid; grid-template-columns: repeat(4,1fr); }
+@media (max-width: 640px) { .info-grid { grid-template-columns: repeat(2,1fr); } }
+.info-cell { padding: 13px 16px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.info-cell:nth-child(4n) { border-right: none; }
+.info-cell:nth-last-child(-n+4) { border-bottom: none; }
+.info-lbl { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.info-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--navy); }
+.info-val.up   { color: var(--green); }
+.info-val.down { color: var(--red); }
+
+/* ── Main Card ── */
+.main-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+.mc-header { background: var(--navy); padding: 13px 20px; display: flex; align-items: center; gap: 8px; }
+.mc-header h2 { font-size: 14px; font-weight: 600; color: #fff; }
+.mc-header p  { font-size: 11px; color: rgba(255,255,255,.4); margin-left: auto; font-family: var(--mono); }
+
+/* Inputs */
+.inputs-grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
+@media (max-width: 600px) { .inputs-grid { grid-template-columns: 1fr; } }
+.input-col { padding: 18px 20px; }
+.input-col:first-child { border-right: 1px solid var(--border); }
+.col-title { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.field { margin-bottom: 13px; }
+.field:last-child { margin-bottom: 0; }
+label { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 5px; }
+label small { font-weight: 400; text-transform: none; letter-spacing: 0; color: #94a3b8; }
+.wrap { position: relative; }
+.pfx, .sfx { position: absolute; top: 50%; transform: translateY(-50%); font-family: var(--mono); font-size: 12px; color: var(--muted); pointer-events: none; }
+.pfx { left: 10px; }
+.sfx { right: 10px; }
+input[type=number] {
+  width: 100%; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 10px 11px; font-family: var(--mono); font-size: 14px;
+  color: var(--text); background: var(--surface); outline: none;
+  transition: border .15s, box-shadow .15s; -moz-appearance: textfield;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type=number]:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(29,106,229,.09); }
+.has-pfx input { padding-left: 25px; }
+.has-sfx input { padding-right: 34px; }
+
+/* ── Results section with tabs ── */
+.results-section { border-top: 1px solid var(--border); }
+
+/* Tab bar */
+.tab-bar {
+  display: flex; border-bottom: 1px solid var(--border); background: var(--surf2);
+}
+.tab-btn {
+  flex: 1; padding: 12px 16px; background: none; border: none; border-bottom: 2px solid transparent;
+  font-family: var(--font); font-size: 13px; font-weight: 500; color: var(--muted);
+  cursor: pointer; transition: all .15s; text-align: left; display: flex; flex-direction: column; gap: 2px;
+  margin-bottom: -1px;
+}
+.tab-btn:first-child { border-right: 1px solid var(--border); }
+.tab-btn:hover { color: var(--navy); background: rgba(29,106,229,.03); }
+.tab-btn.active { color: var(--navy); border-bottom-color: var(--blue); background: var(--surface); }
+.tab-btn.active.capped-tab { border-bottom-color: var(--amber); }
+.tab-title { font-size: 13px; font-weight: 600; }
+.tab-sub   { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+.tab-qty-badge {
+  display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700;
+  padding: 1px 7px; border-radius: 4px; margin-top: 2px;
+}
+.tab-btn:first-child .tab-qty-badge { background: #EBF3FF; color: var(--blue); }
+.tab-btn:last-child  .tab-qty-badge { background: #FFFBEB; color: var(--amber); }
+.tab-btn.active:first-child .tab-qty-badge { background: var(--blue); color: #fff; }
+.tab-btn.active:last-child  .tab-qty-badge { background: var(--amber); color: #fff; }
+
+/* Tab panels */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Results grid */
+.results-grid { display: grid; grid-template-columns: repeat(4,1fr); }
+@media (max-width: 640px) { .results-grid { grid-template-columns: repeat(2,1fr); } }
+.ri { padding: 15px 18px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.ri:nth-child(4n) { border-right: none; }
+/* last row no bottom border */
+.results-grid .ri:nth-last-child(-n+4) { border-bottom: none; }
+
+.ri.hl-blue   { background: var(--navy); }
+.ri.hl-amber  { background: #7c4a000a; }
+
+.ri-label { font-size: 10px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; }
+.ri.hl-blue  .ri-label { color: rgba(255,255,255,.4); }
+.ri.hl-amber .ri-label { color: var(--amber); opacity: .8; }
+
+.ri-val  { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--navy); }
+.ri.hl-blue  .ri-val { color: #fff; font-size: 24px; }
+.ri.hl-amber .ri-val { color: var(--amber); font-size: 24px; }
+
+.ri-sub  { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 3px; }
+.ri.hl-blue  .ri-sub { color: rgba(255,255,255,.35); }
+.ri.hl-amber .ri-sub { color: #b45309; }
+
+.c-ok   { color: var(--green) !important; }
+.c-warn { color: var(--amber) !important; }
+.c-bad  { color: var(--red)   !important; }
+
+/* P&L strip */
+.pnl-strip { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--border); }
+.pnl-cell { padding: 14px 18px; }
+.pnl-cell.profit { background: #F0FDF4; border-right: 1px solid var(--border); }
+.pnl-cell.loss   { background: #FEF2F2; }
+.pnl-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+.pnl-cell.profit .pnl-label { color: var(--green); }
+.pnl-cell.loss   .pnl-label { color: var(--red); }
+.pnl-row   { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pnl-amt   { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+.pnl-cell.profit .pnl-amt { color: var(--green); }
+.pnl-cell.loss   .pnl-amt { color: var(--red); }
+.pnl-pct   { font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.pnl-cell.profit .pnl-pct { background: #DCFCE7; color: var(--green); }
+.pnl-cell.loss   .pnl-pct { background: #FEE2E2; color: var(--red); }
+.pnl-acc   { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 2px 8px; border-radius: 4px; background: var(--border); }
+.pnl-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+/* Breakdown rows */
+.pnl-breakdown { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+.bd-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 11px; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+.bd-row:last-child { border-bottom: none; font-weight: 600; }
+.bd-lbl { color: var(--muted); }
+.bd-val { font-weight: 500; color: var(--navy); }
+.bd-val.c-ok  { color: var(--green); }
+.bd-val.c-bad { color: var(--red); }
+.bd-hint { font-size: 11px; color: var(--muted); font-style: italic; }
+
+/* Risk bar */
+.risk-strip { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+.risk-strip-label { font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; min-width: 130px; }
+.risk-track { flex: 1; height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.risk-fill  { height: 100%; border-radius: 99px; transition: width .35s ease, background .25s; width: 0%; }
+.risk-label { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+
+/* Footer */
+.card-footer {
+  padding: 11px 20px; background: var(--surf2); border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-note { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.reset-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font-family: var(--font); font-size: 11px; color: var(--muted); cursor: pointer; transition: all .15s; }
+.reset-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* capped notice — removed */
+
+/* Results section title */
+.results-section-title {
+  padding: 10px 20px; font-size: 10px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .7px;
+  background: var(--surf2); border-bottom: 1px solid var(--border); border-top: 1px solid var(--border);
+}
+
+/* ── Formula ref ── */
+.fml-box { background: var(--surf2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-top: 16px; }
+.fml-box h3 { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+.fml-line { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.fml-line:last-child { border-bottom: none; }
+.fml-name { color: var(--muted); }
+.fml-eq   { font-family: var(--mono); color: var(--blue); font-size: 11px; }
+
+/* ── More tools ── */
+.tools-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 8px; }
+@media (max-width: 620px) { .tools-grid { grid-template-columns: 1fr 1fr; } }
+.tool-tile { background: var(--surface); border: 1.5px dashed var(--border); border-radius: 12px; padding: 20px 16px; text-align: center; opacity: .65; }
+.tile-icon { font-size: 26px; margin-bottom: 8px; }
+.tile-name { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+.tile-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.soon-badge { display: inline-block; margin-top: 8px; font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); background: var(--bg); padding: 3px 8px; border-radius: 99px; }
+
+/* Toast */
+#toast { position: fixed; bottom: 22px; right: 22px; background: var(--navy); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transform: translateY(6px); transition: all .22s; pointer-events: none; z-index: 999; max-width: 340px; }
+#toast.show { opacity: 1; transform: translateY(0); }
+
+/* Spinner */
+.spinner { width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.2); border-top-color: rgba(255,255,255,.7); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadein { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+.main-card, .stock-box, .info-panel { animation: fadein .25s ease both; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+      <rect width="20" height="20" rx="5" fill="#1D6AE5"/>
+      <path d="M4 14L7 9L10 11.5L13 6.5L16 9" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Vestl Trader Toolkit
+    <span class="nav-badge">Beta</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('position',this)">Position Sizing</button>
+    <button class="nav-tab" onclick="showPage('more',this)">More Tools <span class="soon-tag">soon</span></button>
+  </div>
+</nav>
+
+<!-- ═══════════════════ POSITION SIZING PAGE ═══════════════════ -->
+<div class="page active" id="page-position">
+<div class="container">
+
+  <div class="page-header">
+    <h1>Position Sizing Calculator</h1>
+    <p>Account Risk % method &nbsp;·&nbsp; Ideal Position Size = Account Risk ÷ Trade Risk</p>
+  </div>
+
+  <!-- Stock Lookup -->
+  <div class="stock-box">
+    <div class="s-label">Live Price Lookup — Search Scrip</div>
+    <div class="s-input-row">
+      <input type="text" id="symbolInput"
+        placeholder="e.g.  RELIANCE  ·  TATAMOTORS  ·  HDFCBANK  ·  AAPL"
+        maxlength="25" autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter') fetchPrice()">
+      <button id="fetchBtn" onclick="fetchPrice()">Get Price</button>
+    </div>
+    <div class="ex-row">
+      <span class="ex-lbl">Exchange:</span>
+      <button class="expill active" onclick="setEx('NS',this)">NSE</button>
+      <button class="expill"        onclick="setEx('BO',this)">BSE</button>
+      <button class="expill"        onclick="setEx('',this)">US / Other</button>
+    </div>
+    <div class="data-hint">Select exchange · Type scrip name · Press Enter or Get Price · Click "Use as Entry"</div>
+    <div id="priceDisplay">
+      <span class="s-placeholder">Enter a scrip name and click Get Price →</span>
+    </div>
+  </div>
+
+  <!-- Stock Info -->
+  <div id="stockInfoPanel">
+    <div class="info-panel">
+      <div class="info-panel-header">
+        <h3 id="infoPanelTitle">Stock Information</h3>
+        <span id="infoPanelTime"></span>
+      </div>
+      <div class="info-grid" id="infoGrid"></div>
+    </div>
+  </div>
+
+  <!-- Main Card -->
+  <div class="main-card">
+    <div class="mc-header">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="6" stroke="#059669" stroke-width="1.5"/>
+        <path d="M4 8.5L6 6.5L8 8L10 5.5" stroke="#059669" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h2>Position Sizing — Account Risk % Method</h2>
+      <p>Ideal Position Size = Account Risk ÷ Trade Risk</p>
+    </div>
+
+    <!-- Inputs -->
+    <div class="inputs-grid">
+      <div class="input-col">
+        <div class="col-title">Trade Setup</div>
+        <div class="field">
+          <label>Entry Price (₹)</label>
+          <div class="wrap has-pfx"><span class="pfx">₹</span>
+            <input type="number" id="entry" value="0" step="0.05" min="0" oninput="calculate()">
+          </div>
+        </div>
+        <div class="field">
+          <label>Stop Loss (₹)</label>
+          <div class="wrap has-pfx"><span class="pfx">₹</span>
+            <input type="number" id="sl" value="0" step="0.05" min="0" oninput="calculate()">
+          </div>
+        </div>
+        <div class="field">
+          <label>Price Target (₹)</label>
+          <div class="wrap has-pfx"><span class="pfx">₹</span>
+            <input type="number" id="target" value="0" step="0.05" min="0" oninput="calculate()">
+          </div>
+        </div>
+      </div>
+
+      <div class="input-col">
+        <div class="col-title">Account & Risk Settings</div>
+        <div class="field">
+          <label>Total Account Size (₹)</label>
+          <div class="wrap has-pfx"><span class="pfx">₹</span>
+            <input type="number" id="account" value="0" step="1000" min="0" oninput="calculate()">
+          </div>
+        </div>
+        <div class="field">
+          <label>Risk Per Trade <small>— max loss % you accept</small></label>
+          <div class="wrap has-sfx">
+            <input type="number" id="riskpct" value="0" step="0.1" min="0" max="100" oninput="syncRiskAmt(); calculate()">
+            <span class="sfx">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Capital at Risk (₹) <small>— syncs with % above</small></label>
+          <div class="wrap has-pfx"><span class="pfx">₹</span>
+            <input type="number" id="riskamt" value="0" step="100" min="0" oninput="syncRiskPct(); calculate()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results section -->
+    <div class="results-section">
+      <div class="results-section-title">Position Details</div>
+      <div class="results-grid" id="gridIdeal"></div>
+      <div class="pnl-strip">
+        <div class="pnl-cell profit">
+          <div class="pnl-label">▲ Profit if Target Hit</div>
+          <div class="pnl-row">
+            <div class="pnl-amt" id="i-profitAmt">—</div>
+            <div class="pnl-pct" id="i-profitPctCap">—</div>
+            <div class="pnl-acc" id="i-profitPctAcc">—</div>
+          </div>
+          <div class="pnl-breakdown" id="i-profitBreak">
+            <span class="bd-hint">Enter a price target above to see profit breakdown</span>
+          </div>
+        </div>
+        <div class="pnl-cell loss">
+          <div class="pnl-label">▼ Loss if Stop Hit</div>
+          <div class="pnl-row">
+            <div class="pnl-amt" id="i-lossAmt">—</div>
+            <div class="pnl-pct" id="i-lossPctCap">—</div>
+            <div class="pnl-acc" id="i-lossPctAcc">—</div>
+          </div>
+          <div class="pnl-breakdown" id="i-lossBreak">
+            <span class="bd-hint">Enter entry and stop loss to see loss breakdown</span>
+          </div>
+        </div>
+      </div>
+      <div class="risk-strip">
+        <span class="risk-strip-label">Account Risk Exposure</span>
+        <div class="risk-track"><div class="risk-fill" id="i-riskBar"></div></div>
+        <span class="risk-label" id="i-riskLabel">0.00%</span>
+      </div>
+    </div><!-- /results-section -->
+
+    <div class="card-footer">
+      <span class="footer-note">Ideal Position Size = Account Risk ÷ Trade Risk &nbsp;·&nbsp; Vestl Trader Toolkit</span>
+      <button class="reset-btn" onclick="resetAll()">↺ Reset</button>
+    </div>
+  </div>
+
+  <!-- Formula ref -->
+  <div class="fml-box">
+    <h3>Formula Reference</h3>
+    <div class="fml-line"><span class="fml-name">Account Risk (₹)</span><span class="fml-eq">= Account Size × Risk %</span></div>
+    <div class="fml-line"><span class="fml-name">Trade Risk (₹ / share)</span><span class="fml-eq">= Entry − Stop Loss</span></div>
+    <div class="fml-line"><span class="fml-name">Ideal Qty (formula)</span><span class="fml-eq">= Account Risk ÷ Trade Risk</span></div>
+    <div class="fml-line"><span class="fml-name">Max Affordable Qty</span><span class="fml-eq">= FLOOR( Account Size ÷ Entry Price )</span></div>
+    <div class="fml-line"><span class="fml-name">Capped Qty</span><span class="fml-eq">= MIN( Ideal Qty , Max Affordable Qty )</span></div>
+    <div class="fml-line"><span class="fml-name">% Profit on Capital</span><span class="fml-eq">= ( Qty × ( Target − Entry ) ) ÷ Capital Deployed × 100</span></div>
+    <div class="fml-line"><span class="fml-name">% Loss on Account</span><span class="fml-eq">= ( Qty × Trade Risk ) ÷ Account Size × 100</span></div>
+  </div>
+
+</div>
+</div>
+
+<!-- ═══════════════════ MORE TOOLS ═══════════════════ -->
+<div class="page" id="page-more">
+<div class="container">
+  <div class="page-header"><h1>More Tools</h1><p>TraderKit is growing — these tools are coming next.</p></div>
+  <div class="tools-grid">
+    <div class="tool-tile"><div class="tile-icon">📊</div><div class="tile-name">Trade Journal</div><div class="tile-desc">Log trades, track P&L, win rate and streaks</div><div class="soon-badge">Coming Soon</div></div>
+    <div class="tool-tile"><div class="tile-icon">⚖️</div><div class="tile-name">Risk Dashboard</div><div class="tile-desc">Total exposure and heat map across open positions</div><div class="soon-badge">Coming Soon</div></div>
+    <div class="tool-tile"><div class="tile-icon">🎯</div><div class="tile-name">Target Calculator</div><div class="tile-desc">Set R multiples, auto-calculate partial exit levels</div><div class="soon-badge">Coming Soon</div></div>
+    <div class="tool-tile"><div class="tile-icon">📈</div><div class="tile-name">Breakeven Tracker</div><div class="tile-desc">Averaging down & breakeven price after partial exits</div><div class="soon-badge">Coming Soon</div></div>
+    <div class="tool-tile"><div class="tile-icon">🔔</div><div class="tile-name">Price Alerts</div><div class="tile-desc">Set SL and target alerts for any scrip</div><div class="soon-badge">Coming Soon</div></div>
+    <div class="tool-tile"><div class="tile-icon">📐</div><div class="tile-name">Options Sizing</div><div class="tile-desc">Premium-based position sizing for option buyers</div><div class="soon-badge">Coming Soon</div></div>
+  </div>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Page nav ──────────────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Result tab switch (removed — single panel now) ───────────────────────────
+
+// ── Main calculate ────────────────────────────────────────────────────────────
+function calculate() {
+  const entry   = +document.getElementById('entry').value   || 0;
+  const sl      = +document.getElementById('sl').value      || 0;
+  const target  = +document.getElementById('target').value  || 0;
+  const account = +document.getElementById('account').value || 0;
+  const riskPct = +document.getElementById('riskpct').value || 0;
+
+  const tradeRisk   = entry > 0 && sl > 0 && entry > sl ? entry - sl : 0;
+  const accountRisk = account > 0 && riskPct > 0 ? account * (riskPct / 100) : 0;
+  const idealQty    = tradeRisk > 0 && accountRisk > 0 ? Math.round(accountRisk / tradeRisk) : 0;
+
+  const shared = { entry, sl, target, account, tradeRisk, accountRisk };
+  renderSet('Ideal', idealQty, 'hl-blue', shared,
+    idealQty > 0 ? `${fNum(idealQty)} shares · capital needed ${fINR(idealQty * entry)}` : '');
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function toast(msg, dur=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+const fINR = (n, d=0) => n==null||isNaN(n)||!isFinite(n) ? '—'
+  : '₹' + Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fNum  = (n, d=0) => n==null||isNaN(n)||!isFinite(n) ? '—'
+  : n.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fCr   = n => {
+  if (!n) return '—';
+  if (n>=1e12) return '₹'+(n/1e12).toFixed(2)+'T';
+  if (n>=1e7)  return '₹'+(n/1e7).toFixed(2)+' Cr';
+  if (n>=1e5)  return '₹'+(n/1e5).toFixed(2)+' L';
+  return '₹'+n.toLocaleString('en-IN');
+};
+const fVol  = n => {
+  if (!n) return '—';
+  if (n>=1e7)  return (n/1e7).toFixed(2)+' Cr';
+  if (n>=1e5)  return (n/1e5).toFixed(2)+' L';
+  if (n>=1000) return (n/1000).toFixed(1)+'K';
+  return n.toString();
+};
+
+// ── Risk sync ─────────────────────────────────────────────────────────────────
+let syncing = false;
+function syncRiskAmt() {
+  if (syncing) return; syncing = true;
+  const acc = +document.getElementById('account').value;
+  const pct = +document.getElementById('riskpct').value;
+  document.getElementById('riskamt').value = (acc>0&&pct>0) ? (acc*pct/100).toFixed(2) : 0;
+  syncing = false;
+}
+function syncRiskPct() {
+  if (syncing) return; syncing = true;
+  const acc = +document.getElementById('account').value;
+  const amt = +document.getElementById('riskamt').value;
+  document.getElementById('riskpct').value = (acc>0&&amt>0) ? (amt/acc*100).toFixed(2) : 0;
+  syncing = false;
+}
+
+// ── Build metrics for a given qty ────────────────────────────────────────────
+function buildMetrics(qty, { entry, sl, target, account, tradeRisk, accountRisk }) {
+  const capital     = qty > 0 && entry > 0 ? qty * entry : 0;
+  const maxLoss     = qty > 0 && tradeRisk > 0 ? qty * tradeRisk : 0;
+  const actualRisk  = account > 0 && maxLoss > 0 ? (maxLoss / account) * 100 : 0;
+  const lossOnCap   = capital > 0 && maxLoss > 0 ? (maxLoss / capital) * 100 : 0;
+  const profitPPS   = target > 0 && target > entry && entry > 0 ? target - entry : 0;
+  const totalProfit = qty > 0 && profitPPS > 0 ? qty * profitPPS : 0;
+  const profitOnCap = capital > 0 && totalProfit > 0 ? (totalProfit / capital) * 100 : 0;
+  const profitOnAcc = account > 0 && totalProfit > 0 ? (totalProfit / account) * 100 : 0;
+  const capUsedPct  = account > 0 && capital > 0 ? (capital / account) * 100 : 0;
+  const rr          = tradeRisk > 0 && profitPPS > 0 ? profitPPS / tradeRisk : 0;
+  return { capital, maxLoss, actualRisk, lossOnCap, profitPPS, totalProfit,
+           profitOnCap, profitOnAcc, capUsedPct, rr };
+}
+
+// ── Render one result panel ───────────────────────────────────────────────────
+// prefix = 'Ideal'  →  grid id = 'gridIdeal', element ids = 'i-profitAmt' etc.
+function renderSet(prefix, qty, hlClass, shared, extraInfo) {
+  const m   = buildMetrics(qty, shared);
+  // 'Ideal' → 'i',  'Capped' → 'c'
+  const pid = prefix.charAt(0).toLowerCase();
+  const { entry, tradeRisk, accountRisk, account } = shared;
+
+  const rrCls   = m.rr>=2?'c-ok':m.rr>=1?'c-warn':m.rr>0?'c-bad':'';
+  const riskCls = m.actualRisk<=0?'':m.actualRisk<=2?'c-ok':m.actualRisk<=5?'c-warn':'c-bad';
+
+  // Main metrics grid (8 cells)
+  const items = [
+    { label: 'Position Size (Qty)',
+      val:  qty > 0 ? fNum(qty) : '—',
+      sub:  extraInfo || (m.capital > 0 ? m.capUsedPct.toFixed(1)+'% of account' : ''),
+      hl: true },
+    { label: 'Trade Risk / Share',
+      val: tradeRisk > 0 ? fINR(tradeRisk,2) : '—' },
+    { label: 'Account Risk (₹)',
+      val: accountRisk > 0 ? fINR(accountRisk) : '—',
+      sub: accountRisk > 0 && account > 0 ? ((accountRisk/account)*100).toFixed(2)+'% of account' : '' },
+    { label: 'Capital Deployed',
+      val: m.capital > 0 ? fINR(m.capital) : '—',
+      sub: m.capital > 0 ? m.capUsedPct.toFixed(1)+'% of account' : '' },
+    { label: 'Max Loss (₹)',
+      val: m.maxLoss > 0 ? fINR(m.maxLoss) : '—',
+      sub: m.maxLoss > 0 ? fNum(qty)+' shares × '+fINR(tradeRisk,2) : '' },
+    { label: '% Loss on Capital',
+      val: m.lossOnCap > 0 ? m.lossOnCap.toFixed(2)+'%' : '—',
+      cls: m.lossOnCap<=5?'c-ok':m.lossOnCap<=10?'c-warn':'c-bad' },
+    { label: 'Risk : Reward',
+      val: m.rr > 0 ? '1 : '+m.rr.toFixed(1) : '—', cls: rrCls },
+    { label: '% Risk on Account',
+      val: m.actualRisk > 0 ? m.actualRisk.toFixed(2)+'%' : '—', cls: riskCls },
+  ];
+
+  document.getElementById('grid'+prefix).innerHTML = items.map(it => `
+    <div class="ri ${it.hl ? hlClass : ''}">
+      <div class="ri-label">${it.label}</div>
+      <div class="ri-val ${it.cls||''}">${it.val}</div>
+      ${it.sub ? `<div class="ri-sub">${it.sub}</div>` : ''}
+    </div>`).join('');
+
+  // ── P&L panel ──
+  const hasProfit = m.totalProfit > 0;
+  document.getElementById(pid+'-profitAmt').textContent    = hasProfit ? '+'+fINR(m.totalProfit) : '—';
+  document.getElementById(pid+'-profitPctCap').textContent = hasProfit ? '+'+m.profitOnCap.toFixed(2)+'% on capital' : '—';
+  document.getElementById(pid+'-profitPctAcc').textContent = hasProfit ? '+'+m.profitOnAcc.toFixed(2)+'% on account' : '';
+  document.getElementById(pid+'-profitBreak').innerHTML    = hasProfit
+    ? `<span class="bd-row"><span class="bd-lbl">Shares</span><span class="bd-val">${fNum(qty)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Gain / Share</span><span class="bd-val">+${fINR(m.profitPPS,2)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Total Profit</span><span class="bd-val c-ok">+${fINR(m.totalProfit)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Return on Capital</span><span class="bd-val c-ok">+${m.profitOnCap.toFixed(2)}%</span></span>
+       <span class="bd-row"><span class="bd-lbl">Return on Account</span><span class="bd-val c-ok">+${m.profitOnAcc.toFixed(2)}%</span></span>`
+    : '<span class="bd-hint">Enter a price target above to see profit breakdown</span>';
+
+  const hasLoss = m.maxLoss > 0 && qty > 0;
+  document.getElementById(pid+'-lossAmt').textContent    = hasLoss ? '-'+fINR(m.maxLoss) : '—';
+  document.getElementById(pid+'-lossPctCap').textContent = hasLoss ? '-'+m.lossOnCap.toFixed(2)+'% on capital' : '—';
+  document.getElementById(pid+'-lossPctAcc').textContent = hasLoss ? '-'+m.actualRisk.toFixed(2)+'% on account' : '';
+  document.getElementById(pid+'-lossBreak').innerHTML    = hasLoss
+    ? `<span class="bd-row"><span class="bd-lbl">Shares</span><span class="bd-val">${fNum(qty)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Loss / Share</span><span class="bd-val">-${fINR(tradeRisk,2)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Max Loss</span><span class="bd-val c-bad">-${fINR(m.maxLoss)}</span></span>
+       <span class="bd-row"><span class="bd-lbl">Loss on Capital</span><span class="bd-val c-bad">-${m.lossOnCap.toFixed(2)}%</span></span>
+       <span class="bd-row"><span class="bd-lbl">Loss on Account</span><span class="bd-val c-bad">-${m.actualRisk.toFixed(2)}%</span></span>`
+    : '<span class="bd-hint">Enter entry and stop loss to see loss breakdown</span>';
+
+  // ── Risk bar ──
+  const bar = document.getElementById(pid+'-riskBar');
+  bar.style.width      = m.actualRisk > 0 ? Math.min(m.actualRisk / 10 * 100, 100)+'%' : '0%';
+  bar.style.background = m.actualRisk <= 2 ? '#059669' : m.actualRisk <= 5 ? '#D97706' : '#DC2626';
+  const rlbl = document.getElementById(pid+'-riskLabel');
+  rlbl.textContent = m.actualRisk > 0 ? m.actualRisk.toFixed(2)+'%' : '0.00%';
+  rlbl.className   = 'risk-label ' + riskCls;
+}
+
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+function resetAll() {
+  ['entry','sl','target','account','riskpct','riskamt'].forEach(id =>
+    document.getElementById(id).value = 0);
+  calculate();
+  toast('All values reset to zero');
+}
+
+// ── Exchange ──────────────────────────────────────────────────────────────────
+let exSuffix = '.NS';
+function setEx(s, btn) {
+  exSuffix = s ? '.'+s : '';
+  document.querySelectorAll('.expill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Stock Info ────────────────────────────────────────────────────────────────
+function showStockInfo(meta) {
+  document.getElementById('stockInfoPanel').style.display = 'block';
+  document.getElementById('infoPanelTitle').textContent =
+    (meta.shortName || meta.symbol || '') + ' — Market Overview';
+  document.getElementById('infoPanelTime').textContent =
+    'as of '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+
+  const price   = meta.regularMarketPrice   || 0;
+  const prevCls = meta.chartPreviousClose   || meta.previousClose || 0;
+  const open    = meta.regularMarketOpen    || 0;
+  const dayH    = meta.regularMarketDayHigh || 0;
+  const dayL    = meta.regularMarketDayLow  || 0;
+  const vol     = meta.regularMarketVolume  || 0;
+  const mktCap  = meta.marketCap            || 0;
+  const hi52    = meta.fiftyTwoWeekHigh     || 0;
+  const lo52    = meta.fiftyTwoWeekLow      || 0;
+  const chg     = price - prevCls;
+  const chgPct  = prevCls > 0 ? (chg/prevCls)*100 : 0;
+  const up      = chg >= 0;
+
+  document.getElementById('infoGrid').innerHTML = [
+    { label:'Previous Close', val: fINR(prevCls,2) },
+    { label:"Today's Open",   val: fINR(open,2) },
+    { label:'Day High',       val: fINR(dayH,2), cls:'up' },
+    { label:'Day Low',        val: fINR(dayL,2), cls:'down' },
+    { label:'Change',
+      val: (up?'+':'')+fINR(chg,2).replace('₹','₹')+'  ('+( up?'+':'')+chgPct.toFixed(2)+'%)',
+      cls: up?'up':'down' },
+    { label:'Volume',         val: fVol(vol) },
+    { label:'Market Cap',     val: fCr(mktCap) },
+    { label:'52W High / Low', val: fINR(hi52,2)+' / '+fINR(lo52,2) },
+  ].map(c=>`<div class="info-cell"><div class="info-lbl">${c.label}</div><div class="info-val ${c.cls||''}">${c.val}</div></div>`).join('');
+}
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+let lastPrice = null, lastSym = '';
+
+async function fetchPrice() {
+  const raw = document.getElementById('symbolInput').value.trim().toUpperCase().replace(/\s+/g,'');
+  if (!raw) { toast('Please enter a scrip name'); return; }
+  const ticker = /\.[A-Z]{1,3}$/.test(raw) ? raw : raw + exSuffix;
+  const btn  = document.getElementById('fetchBtn');
+  const disp = document.getElementById('priceDisplay');
+  btn.textContent = 'Fetching…'; btn.classList.add('loading');
+  disp.innerHTML = `<div class="s-loading"><div class="spinner"></div>&nbsp;Fetching ${ticker}…</div>`;
+
+  const result = await tryFetch(ticker);
+  btn.textContent = 'Get Price'; btn.classList.remove('loading');
+
+  if (!result) {
+    disp.innerHTML = `<div class="s-error">⚠ Could not fetch <strong>${ticker}</strong>.<br>
+      · Check exchange selection (NSE / BSE) and symbol spelling<br>
+      · Browser may block requests when file is opened locally — try Chrome or host the file online</div>`;
+    return;
+  }
+
+  const m    = result.meta;
+  const price = m.regularMarketPrice;
+  const prev  = m.chartPreviousClose ?? m.previousClose ?? price;
+  const chg   = price - prev;
+  const chgP  = prev > 0 ? (chg/prev)*100 : 0;
+  const cur   = m.currency === 'INR' ? '₹' : (m.currency||'');
+  const name  = m.shortName || m.longName || ticker;
+  const exch  = m.fullExchangeName || m.exchangeName || '';
+  const up    = chg >= 0;
+  lastPrice = price; lastSym = ticker;
+
+  disp.innerHTML = `
+    <div class="price-row">
+      <div class="price-name">
+        <div class="price-company">${name}</div>
+        <div class="price-exch">${exch} · ${ticker}</div>
+      </div>
+      <div class="price-val"><span class="price-cur">${cur}</span>${price.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div class="price-badge ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(chg).toFixed(2)} (${Math.abs(chgP).toFixed(2)}%)</div>
+      <button class="use-btn" onclick="usePrice()">↓ Use as Entry</button>
+    </div>`;
+  showStockInfo(m);
+}
+
+async function tryFetch(ticker) {
+  const yUrls = [
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`,
+    `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`,
+  ];
+  const proxies = [
+    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+  for (const yUrl of yUrls)
+    for (const proxy of proxies)
+      try {
+        const res = await fetch(proxy(yUrl), {signal: AbortSignal.timeout(9000)});
+        if (!res.ok) continue;
+        const outer = await res.json();
+        const raw   = typeof outer.contents === 'string' ? JSON.parse(outer.contents) : outer;
+        const r     = raw?.chart?.result?.[0];
+        if (r?.meta?.regularMarketPrice) return r;
+      } catch(_) {}
+  return null;
+}
+
+function usePrice() {
+  if (!lastPrice) return;
+  const p  = parseFloat(lastPrice.toFixed(2));
+  const sl = parseFloat((p*0.97).toFixed(2));
+  const tg = parseFloat((p*1.06).toFixed(2));
+  document.getElementById('entry').value  = p;
+  document.getElementById('sl').value     = sl;
+  document.getElementById('target').value = tg;
+  calculate();
+  toast(`✓ ${lastSym} ₹${p} applied · SL ₹${sl} · Target ₹${tg} (3% / 6% suggestion)`);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+calculate();
+</script>
+</body>
+</html>
